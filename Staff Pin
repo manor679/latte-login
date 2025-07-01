@@ -1,72 +1,14 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>LatteLink Staff PIN</title>
-  <style>
-    body {
-      background: #f4ede4;
-      font-family: 'Segoe UI', sans-serif;
-      text-align: center;
-      padding-top: 80px;
-      color: #3e2f26;
-    }
-    h1 {
-      font-size: 36px;
-      margin-bottom: 20px;
-    }
-    #pin {
-      font-size: 72px;
-      font-weight: bold;
-      background: #fff;
-      padding: 20px 40px;
-      border-radius: 12px;
-      border: 2px solid #a67c52;
-      display: inline-block;
-    }
-    #countdown {
-      margin-top: 10px;
-      font-size: 18px;
-      color: #6d4c41;
-    }
-  </style>
-</head>
-<body>
-
-  <h1>☕ Staff Code (30-sec PIN)</h1>
-  <div id="pin">------</div>
-  <div id="countdown"></div>
-
-  <script>
-    const secret = "latte_link_secret"; // same secret as your Apps Script
-    const pinBox = document.getElementById("pin");
-    const countdown = document.getElementById("countdown");
-
-    function getCurrentPIN(secret) {
-      const timestamp = Math.floor(Date.now() / 30000).toString();
-      const encoder = new TextEncoder();
-      const keyData = encoder.encode(secret);
-      const msgData = encoder.encode(timestamp);
-
-      return crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
-        .then(key => crypto.subtle.sign("HMAC", key, msgData))
-        .then(sig => {
-          const bytes = new Uint8Array(sig);
-          const pinInt = (bytes[0] + bytes[1]) % 1000000;
-          return pinInt.toString().padStart(6, "0");
-        });
-    }
-
-    async function updatePIN() {
-      const timeLeft = 30 - Math.floor((Date.now() / 1000) % 30);
-      countdown.textContent = `New PIN in ${timeLeft}s`;
-
-      const pin = await getCurrentPIN(secret);
-      pinBox.textContent = pin;
-    }
-
-    updatePIN();
-    setInterval(updatePIN, 1000);
-  </script>
-
-</body>
-</html>
+function getCurrentPin() {
+  const SECRET = "latte_link_secret"; // Use the same secret string here and in the rest of your code
+  const now = Math.floor(Date.now() / 30000); // Current time in 30-sec intervals
+  const key = Utilities.newBlob(SECRET).getBytes();
+  const message = Utilities.newBlob(now.toString()).getBytes();
+  const signature = Utilities.computeHmacSha256Signature(message, key);
+  
+  let num = 0;
+  for (let i = 0; i < 4; i++) {
+    num = (num << 8) + (signature[i] & 0xff);
+  }
+  num = Math.abs(num) % 1000000;
+  return ("000000" + num).slice(-6);
+}
