@@ -1,0 +1,27 @@
+function doGet(e) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Customers");
+  const id = e.parameter.id;
+
+  if (!id) {
+    return ContentService.createTextOutput(JSON.stringify({ message: "No ID provided." }))
+                         .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  const data = sheet.getDataRange().getValues();
+  let found = false;
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === id) {
+      found = true;
+      return ContentService.createTextOutput(JSON.stringify({
+        message: `Hi ${id}, you've had ${data[i][1]} coffee${data[i][1] == 1 ? '' : 's'} so far.`
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  // If not found, add to sheet
+  sheet.appendRow([id, 0, new Date()]);
+  return ContentService.createTextOutput(JSON.stringify({
+    message: `Welcome ${id}! You've been added to the system. Start collecting coffees today!`
+  })).setMimeType(ContentService.MimeType.JSON);
+}
