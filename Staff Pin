@@ -1,6 +1,7 @@
+const SECRET = "latte_link_secret"; // Your secret for rotating PIN
+
 function getCurrentPin() {
-  const SECRET = "latte_link_secret"; // Use the same secret string here and in the rest of your code
-  const now = Math.floor(Date.now() / 30000); // Current time in 30-sec intervals
+  const now = Math.floor(Date.now() / 30000);
   const key = Utilities.newBlob(SECRET).getBytes();
   const message = Utilities.newBlob(now.toString()).getBytes();
   const signature = Utilities.computeHmacSha256Signature(message, key);
@@ -11,4 +12,63 @@ function getCurrentPin() {
   }
   num = Math.abs(num) % 1000000;
   return ("000000" + num).slice(-6);
+}
+
+function jsonResponse(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  try {
+    const params = e.parameter;
+    const id = (params.id || "").trim().toLowerCase();
+    const pin = (params.pin || "").trim();
+
+    if (!id || !pin) {
+      return jsonResponse({ error: "Missing customer ID or staff PIN." });
+    }
+
+    if (pin !== getCurrentPin()) {
+      return jsonResponse({ error: "Invalid staff PIN." });
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("Customers");
+    if (!sheet) {
+      return jsonResponse({ error: "Sheet 'Customers' not found." });
+    }
+
+    const data = sheet.getDataRange().getValues();
+
+    const idCol = 0;
+    const coffeeCol = 1;
+    const dateCol = 2;
+
+    let rowIndex = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][idCol].toString().toLowerCase() === id) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+
+    if (rowIndex === -1) {
+      // New customer: add with 1 coffee
+      sheet.appendRow([id, 1, new Date()]);
+      return jsonResponse({ coffees: 1, message: "Welcome! Your first coffee has been added." });
+    } else {
+      // Existing customer: increment coffee count
+      let currentCount = Number(sheet.getRange(rowIndex, coffeeCol + 1).getValue()) || 0;
+      currentCount++;
+      sheet.getRange(rowIndex, coffeeCol + 1).setValue(currentCount);
+      sheet.getRange(rowIndex, dateCol + 1).setValue(new Date());
+      return jsonResponse({ coffees: currentCount, message: "Coffee count updated." });
+    }
+  } catch (err) {
+    return jsonResponse({ error: "Error: " + err.message });
+  }
+}
+
+function doGet() {
+  return ContentService.createTextOutput("Please use POST requests only.").setMimeType(ContentService.MimeType.TEXT);
 }
